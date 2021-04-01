@@ -75,18 +75,24 @@ class CalderaSamlService(BaseService, LoginHandlerInterface):
             self.log.error('Error when processing SAML response: %s' % ', '.join(errors))
         else:
             if saml_auth.is_authenticated():
-                username = self._get_saml_login_username(saml_auth)
-                self.log.debug('SAML provided username: %s' % username)
-                if username:
-                    if username in self.auth_svc.user_map:
+                app_username = self._get_saml_login_username(saml_auth)
+                username_attr = self._get_saml_username_attribute(saml_auth)
+                self.log.debug('SAML provided application username: %s' % app_username)
+                self.log.debug('SAML provided username attribute: %s' % username_attr)
+                if app_username:
+                    if app_username in self.auth_svc.user_map:
                         # Will raise redirect on success
-                        await self.auth_svc.provide_verified_login_response(request, username)
+                        self.log.info('User "%s" authenticated via SAML under application user "%s"' %
+                                      (username_attr, app_username))
+                        await self.auth_svc.provide_verified_login_response(request, app_username)
                     else:
-                        self.log.warn('Username %s not configured for login' % username)
+                        self.log.warn('Application username "%s" not configured for login' % app_username)
+                        self.log.info('User "%s" failed to authenticate via SAML under application user "%s"' %
+                                      (username_attr, app_username))
                 else:
                     self.log.error('No NameID or username attribute provided in SAML response.')
             else:
-                self.log.warn('Not authenticated.')
+                self.log.warn('SAML request not authenticated.')
 
     @staticmethod
     def _get_saml_login_username(saml_auth):
@@ -96,6 +102,12 @@ class CalderaSamlService(BaseService, LoginHandlerInterface):
         name_id = saml_auth.get_nameid()
         if name_id:
             return name_id
+        return CalderaSamlService._get_saml_username_attribute(saml_auth)
+
+    @staticmethod
+    def _get_saml_username_attribute(saml_auth):
+        """Returns the "username" attribute for the SAML request. This should be the username
+        for the identity provider, not necessarily the username for the application."""
         attributes = saml_auth.get_attributes()
         username_attr_list = attributes.get('username', [])
         return username_attr_list[0] if len(username_attr_list) > 0 else None
