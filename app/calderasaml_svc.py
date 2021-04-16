@@ -51,13 +51,15 @@ class CalderaSamlService(BaseService):
         errors = saml_auth.get_errors()
         if errors:
             errors = ', '.join(errors)
-            raise Exception('Error when processing SAML response: %s', errors)
+            raise Exception('Error when processing SAML response: %s' % errors)
         else:
             if saml_auth.is_authenticated():
                 app_username = self._get_saml_login_username(saml_auth)
                 username_attr = self._get_saml_username_attribute(saml_auth)
-                self.log.debug('SAML provided application username: %s', app_username)
-                self.log.debug('SAML provided username attribute: %s', username_attr)
+                self.log.debug('Identity Provider provided application username: %s', app_username)
+                self.log.debug('Identity Provider provided username attribute: %s', username_attr)
+                if not username_attr:
+                    raise Exception('No username attribute provided in SAML request. Required for auditing purposes.')
                 if app_username:
                     if app_username in auth_svc.user_map:
                         # Will raise redirect on success
