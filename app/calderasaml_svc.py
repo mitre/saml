@@ -8,6 +8,7 @@ from onelogin.saml2.auth import OneLogin_Saml2_Auth
 
 from app.utility.base_service import BaseService
 
+
 class CalderaSamlService(BaseService):
     def __init__(self, services):
         self.services = services

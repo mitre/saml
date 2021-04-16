@@ -5,8 +5,10 @@ from app.service.interfaces.i_login_handler import LoginHandlerInterface
 
 HANDLER_NAME = 'SAML Login Handler'
 
+
 def load_login_handler(services):
     return SamlLoginHandler(services)
+
 
 class SamlLoginHandler(LoginHandlerInterface):
     def __init__(self, services):
