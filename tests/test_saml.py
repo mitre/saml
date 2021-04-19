@@ -1,14 +1,9 @@
-import pytest
-
-from base64 import b64encode
-
-from plugins.calderasaml.app.saml_login_handler import SamlLoginHandler
-from plugins.calderasaml.app.calderasaml_svc import CalderaSamlService
-
 import os
+import pytest
+import yaml
+
 from http import HTTPStatus
 from pathlib import Path
-import yaml
 from aiohttp import web
 
 from app.api.rest_api import RestApi
@@ -22,6 +17,7 @@ from app.service.planning_svc import PlanningService
 from app.service.rest_svc import RestService
 from app.utility.base_service import BaseService
 from app.utility.base_world import BaseWorld
+from plugins.saml.app.saml_login_handler import SamlLoginHandler
 
 
 @pytest.fixture
@@ -30,7 +26,7 @@ def aiohttp_client(loop, aiohttp_client):
     async def initialize():
         with open(Path(__file__).parents[3] / 'conf' / 'default.yml', 'r') as fle:
             config = yaml.safe_load(fle)
-            config.get('plugins', []).append('calderasaml')
+            config.get('plugins', []).append('saml')
             BaseWorld.apply_config('main', config)
         with open(Path(__file__).parents[3] / 'conf' / 'payloads.yml', 'r') as fle:
             BaseWorld.apply_config('payloads', yaml.safe_load(fle))
@@ -47,7 +43,7 @@ def aiohttp_client(loop, aiohttp_client):
         os.chdir(str(Path(__file__).parents[3]))
 
         await app_svc.register_contacts()
-        await app_svc.load_plugins(['sandcat', 'ssl', 'calderasaml'])
+        await app_svc.load_plugins(['sandcat', 'ssl', 'saml'])
         _ = await RestApi(services).enable()
         await auth_svc.apply(app_svc.application, auth_svc.get_config('users'))
         await auth_svc.set_login_handlers(services)

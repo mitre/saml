@@ -9,9 +9,9 @@ from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from app.utility.base_service import BaseService
 
 
-class CalderaSamlService(BaseService):
+class SamlService(BaseService):
     def __init__(self):
-        self.config_dir_path = os.path.relpath(os.path.join('plugins', 'calderasaml', 'conf'))
+        self.config_dir_path = os.path.relpath(os.path.join('plugins', 'saml', 'conf'))
         self.settings_path = os.path.relpath(os.path.join(self.config_dir_path, 'settings.json'))
         with open(self.settings_path, 'rb') as settings_file:
             self._saml_config = json.load(settings_file)
@@ -94,7 +94,7 @@ class CalderaSamlService(BaseService):
         name_id = saml_auth.get_nameid()
         if name_id:
             return name_id
-        return CalderaSamlService._get_saml_username_attribute(saml_auth)
+        return SamlService._get_saml_username_attribute(saml_auth)
 
     @staticmethod
     def _get_saml_username_attribute(saml_auth):
