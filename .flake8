@@ -12,4 +12,4 @@ exclude =
     .venv
 
 per-file-ignores =
-    app/calderasaml_svc.py:E402
+    app/saml_svc.py:E402
