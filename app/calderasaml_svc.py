@@ -10,8 +10,7 @@ from app.utility.base_service import BaseService
 
 
 class CalderaSamlService(BaseService):
-    def __init__(self, services):
-        self.services = services
+    def __init__(self):
         self.config_dir_path = os.path.relpath(os.path.join('plugins', 'calderasaml', 'conf'))
         self.settings_path = os.path.relpath(os.path.join(self.config_dir_path, 'settings.json'))
         with open(self.settings_path, 'rb') as settings_file:
@@ -32,18 +31,19 @@ class CalderaSamlService(BaseService):
     async def set_saml_login_handler(self):
         """Set self as the optional login handler for the auth service."""
         self.log.debug('Setting SAML as primary login handler for auth service.')
-        auth_svc = self.services.get('auth_svc', None)
+        auth_svc = self.get_service('auth_svc')
         if not auth_svc:
             raise Exception('Auth service not available')
         await auth_svc.set_optional_login_handler(self)
 
     async def get_saml_auth(self, request):
         saml_response = await self._prepare_auth_parameter(request)
+        self.log.debug(saml_response)
         return OneLogin_Saml2_Auth(saml_response, self._saml_config)
 
     async def _saml_login(self, request):
         self.log.debug('Handling login from SAML identity provider.')
-        auth_svc = self.services.get('auth_svc', None)
+        auth_svc = self.get_service('auth_svc')
         if not auth_svc:
             raise Exception('Auth service not available')
         saml_auth = await self.get_saml_auth(request)

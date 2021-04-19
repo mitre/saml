@@ -78,6 +78,13 @@ file within the plugin according to the [python3-saml instructions](https://gith
         CALDERA application configuration.
         - The `binding` can be kept as `"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"`
     - The `x509cert` should be the base64-encoded string for the IdP's X.509 certificate.
+- Under `security`:
+    - Set `wantAttributeStatement` to `true`
+    - Set the remaining security settings as needed for your environment. 
+    - Note that the security settings as shown in the 
+    [`python3-saml` readme](https://github.com/onelogin/python3-saml/#settings) are placed in a separate
+    file called `advanced_settings.json`. For simplicity, the `saml` plugin requires you to combine all settings
+    into the same `conf/settings.json` file, as shown in the example below.
     
 You may adjust settings as needed for your environment.
   
@@ -101,6 +108,11 @@ Below is a sample template for the SAML settings JSON file
             "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
         },
         "x509cert": "base64-encoded certificate data"
+    },
+    "security": {
+        "wantMessagesSigned": true,
+        "wantAssertionsSigned": true,
+        "wantAttributeStatement": true
     }
 }
 ```
