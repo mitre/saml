@@ -38,7 +38,6 @@ class SamlService(BaseService):
 
     async def get_saml_auth(self, request):
         saml_response = await self._prepare_auth_parameter(request)
-        self.log.debug(saml_response)
         return OneLogin_Saml2_Auth(saml_response, self._saml_config)
 
     async def _saml_login(self, request):
