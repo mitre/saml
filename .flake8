@@ -13,3 +13,4 @@ exclude =
 
 per-file-ignores =
     app/saml_svc.py:E402
+    tests/test_saml.py:E501
