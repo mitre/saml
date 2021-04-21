@@ -1,5 +1,6 @@
-# Overview
+# SAML
 
+## Overview
 `saml` is a CALDERA plugin that provides SAML authentication for CALDERA by establishing CALDERA as
 a SAML Service Provider (SP). To use this plugin, users will need to have CALDERA configured as an application
 in their Identity Provider (IdP), and a `conf/settings.json` file will need to be created in the plugin 
@@ -16,7 +17,7 @@ into CALDERA without having to provide login credentials, provided that CALDERA 
 within the IdP settings. If the SAML login fails for whatever reason (e.g. the application was provisioned
 using a username that does not exist within CALDERA), the user will be taken to the default CALDERA login page.
 
-# Dependencies
+## Dependencies
 In order to use this plugin, the [python3-saml](https://github.com/onelogin/python3-saml) Python package is 
 required and can be installed via `pip`:
 ```
@@ -28,12 +29,12 @@ in turn requires certain native libraries. See the [xmlsec page](https://pypi.or
 details and to see which native libraries are required for the operating system that is hosting CALDERA in your
 particular environment.
 
-# Setup
+## Setup
 There are two main setup components required for SAML authentication within this plugin:
 1. The IdP administrators need to configure CALDERA as an application within the IdP platform
 1. CALDERA administrators need to configure the `conf/settings.json` settings file within the `saml` plugin.
 
-## Configuring CALDERA Within the IdP Platform
+### Configuring CALDERA Within the IdP Platform
 To provision CALDERA access for users within the Identity Provider, follow the instructions for your particular
 Identity Provider to create the CALDERA application with the appropriate SAML settings. 
 
@@ -52,14 +53,14 @@ access to the necessary users. You will also need to follow your IdP's instructi
 the SSO URL for the IdP, the IdP Issuer URL, and the X.509 Certificate for the IdP.
 This information is needed to configure the SAML settings within this plugin.
 
-### Application Usernames
+#### Application Usernames
 To avoid having to create individual CALDERA accounts for each user in the IdP, one method is to create a fixed
 set of CALDERA user accounts (e.g. `red` and `blue` users) and assign the CALDERA username as the
 application username for the user assignment. This way, multiple users can log in using the same
 CALDERA username, and the SAML request will also include their `username` attribute statement, so that
 CALDERA's authentication service can distinguish between different users from the IdP platform.
 
-## Configuring SAML settings within CALDERA
+### Configuring SAML settings within CALDERA
 Once CALDERA is configured as an application within your IdP, you can start creating the `conf/settings.json`
 file within the plugin according to the [python3-saml instructions](https://github.com/onelogin/python3-saml#settings)
 .
