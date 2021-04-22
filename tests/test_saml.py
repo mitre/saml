@@ -25,7 +25,7 @@ def aiohttp_client(loop, aiohttp_client):
 
     async def initialize():
         added_dummy_settings = False
-        saml_settings_path = os.path.relpath(os.path.join('plugins', 'saml', 'conf', 'settings.json'))
+        saml_settings_path = os.path.relpath(os.path.join(Path(__file__).parents[1], 'conf', 'settings.json'))
         with open(Path(__file__).parents[3] / 'conf' / 'default.yml', 'r') as fle:
             config = yaml.safe_load(fle)
             config.get('plugins', []).append('saml')
