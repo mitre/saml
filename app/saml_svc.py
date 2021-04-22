@@ -12,7 +12,7 @@ from app.utility.base_service import BaseService
 
 class SamlService(BaseService):
     def __init__(self):
-        self.config_dir_path = os.path.relpath(os.path.join(Path(__file__).parents[1], 'conf'))
+        self.config_dir_path = os.path.join(Path(__file__).parents[1], 'conf')
         self.settings_path = os.path.relpath(os.path.join(self.config_dir_path, 'settings.json'))
         with open(self.settings_path, 'rb') as settings_file:
             self._saml_config = json.load(settings_file)
