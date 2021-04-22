@@ -33,7 +33,7 @@ def aiohttp_client(loop, aiohttp_client):
         with open(Path(__file__).parents[3] / 'conf' / 'payloads.yml', 'r') as fle:
             BaseWorld.apply_config('payloads', yaml.safe_load(fle))
         if not os.path.exists(saml_settings_path):
-            with open(saml_settings_path, 'wb') as settings_file:
+            with open(saml_settings_path, 'w') as settings_file:
                 # Add in empty settings file if it doesn't already exist to load SAML service.
                 settings_file.write('{}')
             added_dummy_settings = True
