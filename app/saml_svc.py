@@ -13,13 +13,9 @@ class SamlService(BaseService):
     def __init__(self):
         self.config_dir_path = os.path.relpath(os.path.join('plugins', 'saml', 'conf'))
         self.settings_path = os.path.relpath(os.path.join(self.config_dir_path, 'settings.json'))
+        with open(self.settings_path, 'rb') as settings_file:
+            self._saml_config = json.load(settings_file)
         self.log = self.add_service('saml_svc', self)
-        try:
-            with open(self.settings_path, 'rb') as settings_file:
-                self._saml_config = json.load(settings_file)
-        except OSError as e:
-            self.log.exception('Could not load settings from conf/settings.json')
-            self._saml_config = dict()
 
     async def saml(self, request):
         """Handle SAML authentication."""

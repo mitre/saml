@@ -24,12 +24,19 @@ from plugins.saml.app.saml_login_handler import SamlLoginHandler
 def aiohttp_client(loop, aiohttp_client):
 
     async def initialize():
+        added_dummy_settings = False
+        saml_settings_path = os.path.relpath(os.path.join('plugins', 'saml', 'conf', 'settings.json'))
         with open(Path(__file__).parents[3] / 'conf' / 'default.yml', 'r') as fle:
             config = yaml.safe_load(fle)
             config.get('plugins', []).append('saml')
             BaseWorld.apply_config('main', config)
         with open(Path(__file__).parents[3] / 'conf' / 'payloads.yml', 'r') as fle:
             BaseWorld.apply_config('payloads', yaml.safe_load(fle))
+        if not os.path.exists(saml_settings_path):
+            with open(saml_settings_path, 'wb') as settings_file:
+                # Add in empty settings file if it doesn't already exist to load SAML service.
+                settings_file.write('{}')
+            added_dummy_settings = True
 
         app_svc = AppService(web.Application())
         _ = DataService()
@@ -45,6 +52,8 @@ def aiohttp_client(loop, aiohttp_client):
         await app_svc.register_contacts()
         await app_svc.load_plugins(['sandcat', 'ssl', 'saml'])
         _ = await RestApi(services).enable()
+        if added_dummy_settings:
+            os.remove(saml_settings_path)
         await auth_svc.apply(app_svc.application, auth_svc.get_config('users'))
         await auth_svc.set_login_handlers(services)
         return app_svc.application
