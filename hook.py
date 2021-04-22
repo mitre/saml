@@ -9,4 +9,3 @@ async def enable(services):
     app = services.get('app_svc').application
     saml_svc = SamlService()
     app.router.add_route('*', '/saml', saml_svc.saml)
-
