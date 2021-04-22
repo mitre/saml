@@ -22,11 +22,7 @@ from plugins.saml.app.saml_login_handler import SamlLoginHandler
 
 @pytest.fixture
 def aiohttp_client(loop, aiohttp_client):
-
     async def initialize():
-        added_dummy_settings = False
-        saml_settings_path = os.path.join(Path(__file__).parents[1], 'conf', 'settings.json')
-        print(saml_settings_path)
         with open(Path(__file__).parents[3] / 'conf' / 'default.yml', 'r') as fle:
             config = yaml.safe_load(fle)
             config.get('plugins', []).append('saml')
@@ -53,13 +49,15 @@ def aiohttp_client(loop, aiohttp_client):
         await app_svc.register_contacts()
         await app_svc.load_plugins(['sandcat', 'ssl', 'saml'])
         _ = await RestApi(services).enable()
-        if added_dummy_settings:
-            os.remove(saml_settings_path)
         await auth_svc.apply(app_svc.application, auth_svc.get_config('users'))
         await auth_svc.set_login_handlers(services)
         return app_svc.application
 
+    added_dummy_settings = False
+    saml_settings_path = os.path.join(Path(__file__).parents[1], 'conf', 'settings.json')
     app = loop.run_until_complete(initialize())
+    if added_dummy_settings:
+        os.remove(saml_settings_path)
     return loop.run_until_complete(aiohttp_client(app))
 
 
