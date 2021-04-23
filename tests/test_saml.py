@@ -22,7 +22,6 @@ from plugins.saml.app.saml_login_handler import SamlLoginHandler
 
 @pytest.fixture
 def aiohttp_client(loop, aiohttp_client):
-
     async def initialize():
         with open(Path(__file__).parents[3] / 'conf' / 'default.yml', 'r') as fle:
             config = yaml.safe_load(fle)
@@ -49,7 +48,16 @@ def aiohttp_client(loop, aiohttp_client):
         await auth_svc.set_login_handlers(services)
         return app_svc.application
 
+    # Add in empty settings file if it doesn't already exist to load SAML service.
+    added_dummy_settings = False
+    saml_settings_path = os.path.join(Path(__file__).parents[1], 'conf', 'settings.json')
+    if not os.path.exists(saml_settings_path):
+        with open(saml_settings_path, 'w') as settings_file:
+            settings_file.write('{}')
+        added_dummy_settings = True
     app = loop.run_until_complete(initialize())
+    if added_dummy_settings:
+        os.remove(saml_settings_path)
     return loop.run_until_complete(aiohttp_client(app))
 
 

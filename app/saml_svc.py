@@ -4,6 +4,7 @@ import warnings
 warnings.filterwarnings('ignore', 'defusedxml.lxml is no longer supported and will be removed in a future release.', DeprecationWarning)
 
 from aiohttp import web
+from pathlib import Path
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 
 from app.utility.base_service import BaseService
@@ -11,8 +12,8 @@ from app.utility.base_service import BaseService
 
 class SamlService(BaseService):
     def __init__(self):
-        self.config_dir_path = os.path.relpath(os.path.join('plugins', 'saml', 'conf'))
-        self.settings_path = os.path.relpath(os.path.join(self.config_dir_path, 'settings.json'))
+        self.config_dir_path = os.path.join(Path(__file__).parents[1], 'conf')
+        self.settings_path = os.path.join(self.config_dir_path, 'settings.json')
         with open(self.settings_path, 'rb') as settings_file:
             self._saml_config = json.load(settings_file)
         self.log = self.add_service('saml_svc', self)
