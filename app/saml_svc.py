@@ -1,5 +1,7 @@
 import json
 import os
+import warnings
+warnings.filterwarnings('ignore', 'defusedxml.lxml is no longer supported and will be removed in a future release.', DeprecationWarning)
 
 from aiohttp import web
 from pathlib import Path

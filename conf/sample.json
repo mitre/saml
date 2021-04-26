@@ -1,0 +1,24 @@
+{
+    "strict": true,
+    "debug": true,
+    "sp": {
+        "entityId": "http://localhost:8888",
+        "assertionConsumerService": {
+            "url": "http://localhost:8888/saml",
+            "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+        }
+    },
+    "idp": {
+        "entityId": "http://myidentityprovider.com/connector_id_url",
+        "singleSignOnService": {
+            "url": "https://myidentityprovider.com/sso_url",
+            "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+        },
+        "x509cert": "base64-encoded certificate data"
+    },
+    "security": {
+        "wantMessagesSigned": true,
+        "wantAssertionsSigned": true,
+        "wantAttributeStatement": true
+    }
+}
