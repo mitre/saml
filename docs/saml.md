@@ -17,22 +17,19 @@ into CALDERA without having to provide login credentials, provided that CALDERA 
 within the IdP settings. If the SAML login fails for whatever reason (e.g. the application was provisioned
 using a username that does not exist within CALDERA), the user will be taken to the default CALDERA login page.
 
-## Dependencies
-In order to use this plugin, the [python3-saml](https://github.com/onelogin/python3-saml) Python package is 
-required and can be installed via `pip`:
-```
-pip3 install python3-saml
-```
-
-`python3-saml` requires `xmlsec` as an additional Python dependency, which 
-in turn requires certain native libraries. See the [xmlsec page](https://pypi.org/project/xmlsec/) for more
-details and to see which native libraries are required for the operating system that is hosting CALDERA in your
-particular environment.
-
 ## Setup
 There are two main setup components required for SAML authentication within this plugin:
 1. The IdP administrators need to configure CALDERA as an application within the IdP platform
 1. CALDERA administrators need to configure the `conf/settings.json` settings file within the `saml` plugin.
+
+### Installing Dependencies
+To install dependencies, run the following from within the plugin directory::
+```
+pip3 install -r requirements.txt
+```
+Note that `requirements.txt` requires `xmlsec`, which in turn requires certain native libraries. 
+See the [xmlsec page](https://pypi.org/project/xmlsec/) for more details and to see which native libraries are required
+for the operating system that is hosting CALDERA in your particular environment.
 
 ### Configuring CALDERA Within the IdP Platform
 To provision CALDERA access for users within the Identity Provider, follow the instructions for your particular
@@ -63,22 +60,22 @@ CALDERA's authentication service can distinguish between different users from th
 ### Configuring SAML settings within CALDERA
 Once CALDERA is configured as an application within your IdP, you can start creating the `conf/settings.json`
 file within the plugin according to the [python3-saml instructions](https://github.com/onelogin/python3-saml#settings)
-.
-- Make sure `strict` is set to `true`
+. The following settings are required unless marked otherwise:
+- Set `strict` to `true`
 - Under `sp`:
-    - The `entityId` should be the HTTP endpoint for the C2 Server (e.g. `"http://localhost:8888"`)
+    - For `entityId`, use the HTTP endpoint for the C2 Server (e.g. `"http://localhost:8888"`)
     - Under `assertionConsumerService`:
-        - The `url` should be the `/saml` endpoint for the C2 server (e.g. `"http://localhost:8888/saml"`)
-        - For `binding`, you may use `"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"`
+        - The `url` must be the `/saml` endpoint for the C2 server (e.g. `"http://localhost:8888/saml"`)
+        - For `binding`, use `"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"`
     - Do not include an entry for `singleLogoutService`
 - Under `idp`:
-    - The `entityId` should be the identifier URI for the Identity Provider. You will need to obtain this from
-    your CALDERA application configuration for the IdP.
+    - For `entityId`, use the Identity Provider's identifier URI. You will need to obtain this from
+    your CALDERA application configuration for the Identity Provider.
     - Under `singleSignOnService`:
-        - The `url` should be the IdP's SSO URL as provided by the IdP for the
+        - For `url`, use the IdP's SSO URL as provided by the IdP for the
         CALDERA application configuration.
-        - The `binding` can be kept as `"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"`
-    - The `x509cert` should be the base64-encoded string for the IdP's X.509 certificate.
+        - For `binding`, use `"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"`
+    - For the `x509cert`, use the base64-encoded string for the IdP's X.509 certificate.
 - Under `security`:
     - Set `wantAttributeStatement` to `true`
     - Set the remaining security settings as needed for your environment. 
@@ -89,8 +86,8 @@ file within the plugin according to the [python3-saml instructions](https://gith
     
 You may adjust settings as needed for your environment.
   
-Below is a sample template for the SAML settings JSON file
-(refer to the [python3-saml page](https://github.com/onelogin/python3-saml/) for full documentation and examples):
+Below is a sample template for the SAML settings JSON file, which is also located in `config/sample.json` in the plugin.
+Refer to the [python3-saml page](https://github.com/onelogin/python3-saml/) for full documentation and examples.
 ```json
 {
     "strict": true,
