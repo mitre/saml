@@ -114,3 +114,15 @@ Refer to the [python3-saml page](https://github.com/onelogin/python3-saml/) for 
     }
 }
 ```
+
+### Setting the SAML Login Handler
+Once CALDERA's SAML settings are configured and CALDERA is configured on the IdP platform, the final
+step requires updating the CALDERA config YAML file to set the SAML login handler as the main login
+handler to use. Within the config file, set `auth.login.handler.module` to `plugins.saml.app.saml_login_handler`
+as shown below:
+```yaml
+auth.login.handler.module: plugins.saml.app.saml_login_handler
+```
+
+Restart the CALDERA server, and any future authentication requests will now be handled via SAML according
+to the previously established settings.
