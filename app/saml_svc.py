@@ -44,9 +44,19 @@ class SamlService(BaseService):
     async def _saml_login(self, request):
         self.log.debug('Handling login from SAML identity provider.')
         saml_auth = await self.get_saml_auth(request)
-        saml_auth.process_response()
-        self._handle_saml_auth_errors(saml_auth)
-        await self._handle_app_authentication(request, saml_auth)
+
+        # Check if this is a SAML response (POST) or login initiation (GET)
+      if request.method == 'POST' or 'SAMLResponse' in (await request.post()):
+            # Process SAML response
+            saml_auth.process_response()
+            self._handle_saml_auth_errors(saml_auth)
+            await self._handle_app_authentication(request, saml_auth)
+        else:
+            # Initiate SAML login - redirect to IdP
+            redirect_url = saml_auth.login()
+            self.log.debug(f'Redirecting to IdP: {redirect_url}')
+            from aiohttp import web
+            raise web.HTTPFound(redirect_url)
 
     async def _handle_app_authentication(self, request, saml_auth):
         if saml_auth.is_authenticated():
@@ -75,7 +85,29 @@ class SamlService(BaseService):
         else:
             self.log.warn('Application username "%s" not configured for login', app_username)
             self.log.info('User "%s" failed to authenticate via SAML under application user "%s"',
-                          username_attr, app_username)
+                                                username_attr, app_username)
+            
+async def saml_login_handler(self, request):
+    """Handle SAML login initiation (GET)"""
+    self.log.debug('SAML login handler called')
+    return await self._saml_login(request)
+
+async def saml_acs_handler(self, request):
+    """Handle SAML assertion consumer service (POST)"""
+    self.log.debug('SAML ACS handler called')
+    return await self._saml_login(request)
+
+async def saml_metadata_handler(self, request):
+    """Handle SAML metadata requests (GET)"""
+    self.log.debug('SAML metadata handler called')
+    saml_auth = await self.get_saml_auth(request)
+    metadata = saml_auth.get_settings().get_sp_metadata()
+    return web.Response(text=metadata, content_type='text/xml')
+
+async def saml_sls_handler(self, request):
+    """Handle SAML single logout service"""
+    self.log.debug('SAML SLS handler called')
+    return await self._saml_login(request)
 
     @staticmethod
     def _handle_saml_auth_errors(saml_auth):
@@ -110,3 +142,5 @@ class SamlService(BaseService):
         attributes = saml_auth.get_attributes()
         username_attr_list = attributes.get('username', [])
         return username_attr_list[0] if len(username_attr_list) > 0 else None
+                                                                                                                                                                                                                                                                        129,1         Bot
+                          
