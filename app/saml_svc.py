@@ -1,6 +1,8 @@
 import json
 import os
 import warnings
+import logging
+from typing import Dict, Any, Optional
 warnings.filterwarnings('ignore', 'defusedxml.lxml is no longer supported and will be removed in a future release.', DeprecationWarning)
 
 from aiohttp import web
@@ -15,6 +17,7 @@ class SamlService(BaseService):
     def __init__(self):
         self.config_dir_path = os.path.join(Path(__file__).parents[1], 'conf')
         self.settings_path = os.path.join(self.config_dir_path, 'settings.json')
+        self.user_mapping_path = os.path.join(self.config_dir_path, 'user_mapping.json')
         
         # Load SAML configuration with better error handling
         try:
@@ -27,7 +30,31 @@ class SamlService(BaseService):
             self.log.error(f'Invalid JSON in SAML configuration: {e}')
             self._saml_config = {}
             
+        # Load user mapping configuration
+        try:
+            with open(self.user_mapping_path, 'r') as mapping_file:
+                self._user_mapping_config = json.load(mapping_file)
+        except FileNotFoundError:
+            self.log.info(f'User mapping file not found: {self.user_mapping_path}, using defaults')
+            self._user_mapping_config = self._get_default_user_mapping()
+        except json.JSONDecodeError as e:
+            self.log.error(f'Invalid JSON in user mapping configuration: {e}')
+            self._user_mapping_config = self._get_default_user_mapping()
+            
         self.log = self.add_service('saml_svc', self)
+
+    def _get_default_user_mapping(self) -> Dict[str, Any]:
+        """Default user mapping configuration"""
+        return {
+            "role_mappings": {
+                "admin": ["admin", "administrator", "sysadmin"],
+                "blue": ["blue_team", "defender", "analyst"],
+                "red": ["red_team", "attacker", "pentester"],
+                "user": ["user", "viewer", "readonly"]
+            },
+            "group_mappings": {},
+            "email_domain_mappings": {}
+        }
 
     async def saml(self, request):
         """Legacy handler - routes to appropriate specific handler based on path and method"""
@@ -77,7 +104,7 @@ class SamlService(BaseService):
         return OneLogin_Saml2_Auth(saml_response, self._saml_config)
 
     async def _saml_login(self, request):
-        """Core SAML login logic"""
+        """Core SAML login logic with enhanced user provisioning"""
         self.log.debug(f'Handling SAML login: {request.method} {request.path}')
         
         try:
@@ -94,9 +121,9 @@ class SamlService(BaseService):
                     # Check for errors
                     self._handle_saml_auth_errors(saml_auth)
                     
-                    # Handle successful authentication
+                    # Handle successful authentication with enhanced provisioning
                     if saml_auth.is_authenticated():
-                        return await self._handle_app_authentication(request, saml_auth)
+                        return await self._handle_enhanced_authentication(request, saml_auth)
                     else:
                         self.log.error('SAML authentication failed: not authenticated')
                         raise web.HTTPFound('/login')
@@ -113,41 +140,202 @@ class SamlService(BaseService):
             self.log.error(f'SAML login error: {e}')
             raise web.HTTPFound('/login')
 
-    async def _handle_app_authentication(self, request, saml_auth):
-        """Handle successful SAML authentication"""
-        if saml_auth.is_authenticated():
-            app_username = self._get_saml_login_username(saml_auth)
-            username_attr = self._get_saml_username_attribute(saml_auth)
-            self.log.debug('Identity Provider provided application username: %s', app_username)
-            self.log.debug('Identity Provider provided username attribute: %s', username_attr)
+    async def _handle_enhanced_authentication(self, request, saml_auth):
+        """Enhanced authentication handler with automatic user provisioning"""
+        try:
+            # Extract user information from SAML response
+            user_info = self._extract_user_info(saml_auth)
+            self.log.debug(f'Extracted user info: {user_info}')
             
-            if not username_attr:
-                raise Exception('No username attribute provided in SAML request. Required for auditing purposes.')
+            # Determine Caldera role based on SAML attributes
+            caldera_role = self._determine_caldera_role(user_info)
+            self.log.debug(f'Determined Caldera role: {caldera_role}')
             
-            if app_username:
-                await self._validate_username(request, app_username, username_attr)
-            else:
-                self.log.error('No NameID or username attribute provided in SAML response.')
-                raise web.HTTPFound('/login')
-        else:
-            self.log.warn('SAML request not authenticated.')
+            # Provision or update user if enabled
+            if self._is_user_provisioning_enabled():
+                await self._provision_user(user_info, caldera_role)
+            
+            # Authenticate user
+            await self._authenticate_user(request, caldera_role, user_info)
+            
+        except Exception as e:
+            self.log.error(f'Enhanced authentication failed: {e}')
             raise web.HTTPFound('/login')
 
-    async def _validate_username(self, request, app_username, username_attr):
-        """Validate username and create session"""
+    def _extract_user_info(self, saml_auth) -> Dict[str, Any]:
+        """Extract user information from SAML response"""
+        attributes = saml_auth.get_attributes()
+        name_id = saml_auth.get_nameid()
+        
+        # Get configuration for attribute names
+        user_provisioning = self._saml_config.get('user_provisioning', {})
+        email_attr = user_provisioning.get('email_attribute', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress')
+        name_attr = user_provisioning.get('name_attribute', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name')
+        role_attr = user_provisioning.get('role_attribute', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role')
+        group_attr = user_provisioning.get('group_attribute', 'http://schemas.xmlsoap.org/claims/Group')
+        
+        # Extract values
+        user_info = {
+            'name_id': name_id,
+            'email': self._get_attribute_value(attributes, email_attr),
+            'display_name': self._get_attribute_value(attributes, name_attr),
+            'roles': self._get_attribute_values(attributes, role_attr),
+            'groups': self._get_attribute_values(attributes, group_attr),
+            'all_attributes': attributes
+        }
+        
+        # Use name_id as email if email not found
+        if not user_info['email'] and name_id:
+            user_info['email'] = name_id
+            
+        return user_info
+
+    def _get_attribute_value(self, attributes: Dict, attr_name: str) -> Optional[str]:
+        """Get single attribute value"""
+        values = attributes.get(attr_name, [])
+        return values[0] if values else None
+
+    def _get_attribute_values(self, attributes: Dict, attr_name: str) -> list:
+        """Get multiple attribute values"""
+        return attributes.get(attr_name, [])
+
+    def _determine_caldera_role(self, user_info: Dict[str, Any]) -> str:
+        """Determine Caldera role based on SAML attributes and mapping configuration"""
+        user_provisioning = self._saml_config.get('user_provisioning', {})
+        default_role = user_provisioning.get('default_role', 'user')
+        admin_roles = user_provisioning.get('admin_roles', ['admin', 'administrator'])
+        admin_groups = user_provisioning.get('admin_groups', [])
+        
+        # Check if user has admin roles
+        for role in user_info.get('roles', []):
+            if role.lower() in [r.lower() for r in admin_roles]:
+                return 'admin'
+        
+        # Check if user is in admin groups
+        for group in user_info.get('groups', []):
+            if group in admin_groups:
+                return 'admin'
+        
+        # Check role mappings
+        role_mappings = self._user_mapping_config.get('role_mappings', {})
+        for caldera_role, saml_roles in role_mappings.items():
+            for user_role in user_info.get('roles', []):
+                if user_role.lower() in [r.lower() for r in saml_roles]:
+                    return caldera_role
+        
+        # Check group mappings
+        group_mappings = self._user_mapping_config.get('group_mappings', {})
+        for group in user_info.get('groups', []):
+            if group in group_mappings:
+                return group_mappings[group]
+        
+        # Check email domain mappings
+        email_domain_mappings = self._user_mapping_config.get('email_domain_mappings', {})
+        if user_info.get('email'):
+            domain = user_info['email'].split('@')[-1] if '@' in user_info['email'] else ''
+            if domain in email_domain_mappings:
+                return email_domain_mappings[domain]
+        
+        return default_role
+
+    def _is_user_provisioning_enabled(self) -> bool:
+        """Check if user provisioning is enabled"""
+        user_provisioning = self._saml_config.get('user_provisioning', {})
+        return user_provisioning.get('enabled', False)
+
+    async def _provision_user(self, user_info: Dict[str, Any], caldera_role: str):
+        """Provision or update user in Caldera"""
+        try:
+            auth_svc = self.get_service('auth_svc')
+            if not auth_svc:
+                raise Exception('Auth service not available')
+            
+            email = user_info.get('email')
+            display_name = user_info.get('display_name', email)
+            
+            if not email:
+                self.log.warning('No email found in SAML response, cannot provision user')
+                return
+            
+            # Check if user exists
+            user_exists = caldera_role in auth_svc.user_map
+            
+            user_provisioning = self._saml_config.get('user_provisioning', {})
+            create_missing = user_provisioning.get('create_missing_users', True)
+            update_on_login = user_provisioning.get('update_on_login', True)
+            
+            if not user_exists and create_missing:
+                # Create new user
+                self.log.info(f'Creating new user: {caldera_role} for {email}')
+                
+                # Define privileges based on role
+                privileges = self._get_role_privileges(caldera_role)
+                
+                # Add user to auth service
+                auth_svc.user_map[caldera_role] = {
+                    'password': self._generate_temp_password(),
+                    'privileges': privileges,
+                    'created_via_saml': True,
+                    'saml_email': email,
+                    'saml_display_name': display_name,
+                    'last_saml_login': self._get_current_timestamp()
+                }
+                
+                self.log.info(f'User {caldera_role} created successfully')
+                
+            elif user_exists and update_on_login:
+                # Update existing user
+                self.log.debug(f'Updating existing user: {caldera_role}')
+                
+                user_data = auth_svc.user_map[caldera_role]
+                user_data.update({
+                    'saml_email': email,
+                    'saml_display_name': display_name,
+                    'last_saml_login': self._get_current_timestamp()
+                })
+                
+        except Exception as e:
+            self.log.error(f'User provisioning failed: {e}')
+            # Don't fail authentication if provisioning fails
+            pass
+
+    def _get_role_privileges(self, role: str) -> list:
+        """Get privileges for a Caldera role"""
+        role_privileges = {
+            'admin': ['red', 'blue'],
+            'red': ['red'],
+            'blue': ['blue'],
+            'user': []
+        }
+        return role_privileges.get(role, [])
+
+    def _generate_temp_password(self) -> str:
+        """Generate a temporary password for SAML users"""
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits
+        return ''.join(secrets.choice(alphabet) for _ in range(16))
+
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp as string"""
+        from datetime import datetime
+        return datetime.utcnow().isoformat()
+
+    async def _authenticate_user(self, request, caldera_role: str, user_info: Dict[str, Any]):
+        """Authenticate user with Caldera"""
         auth_svc = self.get_service('auth_svc')
         if not auth_svc:
             raise Exception('Auth service not available')
             
-        if app_username in auth_svc.user_map:
+        email = user_info.get('email', 'unknown@unknown.com')
+        display_name = user_info.get('display_name', email)
+        
+        if caldera_role in auth_svc.user_map:
             # Will raise redirect on success
-            self.log.info('User "%s" authenticated via SAML under application user "%s"',
-                          username_attr, app_username)
-            await auth_svc.handle_successful_login(request, app_username)
+            self.log.info(f'User "{display_name}" ({email}) authenticated via SAML as "{caldera_role}"')
+            await auth_svc.handle_successful_login(request, caldera_role)
         else:
-            self.log.warn('Application username "%s" not configured for login', app_username)
-            self.log.info('User "%s" failed to authenticate via SAML under application user "%s"',
-                          username_attr, app_username)
+            self.log.warning(f'Caldera role "{caldera_role}" not configured for user "{display_name}" ({email})')
             raise web.HTTPFound('/login')
 
     # Specific handler methods for different SAML endpoints
