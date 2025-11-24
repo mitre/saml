@@ -1,5 +1,4 @@
 from plugins.saml.app.saml_svc import SamlService
-from plugins.saml.app.saml_login_handler import load_login_handler
 
 name = 'SAML'
 description = 'A plugin that provides SAML authentication for CALDERA'
@@ -25,12 +24,6 @@ async def enable(services):
     
     # Keep the original saml route for backward compatibility with legacy handler
     app.router.add_route('*', '/saml', saml_svc.saml)
-
-    # Register the SAML login handler with Caldera's auth service
-    # This is critical - without this, Caldera will use the default login handler
-    auth_svc = services.get('auth_svc')
-    saml_login_handler = load_login_handler(services)
-    auth_svc.set_login_handler(saml_login_handler)
 
     # Store saml_svc as a registered service so route handlers can access it
     services.get('app_svc').register_subservice('saml_svc', saml_svc)
