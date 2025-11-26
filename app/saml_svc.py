@@ -417,12 +417,25 @@ class SamlService(BaseService):
                 post_data = dict(await request.post())
             except:
                 post_data = {}
-                
+
+        # Check X-Forwarded-Proto header for ALB HTTPS termination
+        forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
+        is_https = (forwarded_proto == 'https') or (request.scheme == 'https')
+
+        # Use X-Forwarded-Host if available (for ALB)
+        http_host = request.headers.get('X-Forwarded-Host', request.host)
+
+        # Determine port based on protocol
+        if request.port:
+            server_port = str(request.port)
+        else:
+            server_port = '443' if is_https else '80'
+
         ret_parameters = {
-            'https': 'on' if request.scheme == 'https' else 'off',
-            'http_host': request.host,
+            'https': 'on' if is_https else 'off',
+            'http_host': http_host,
             'script_name': request.path_qs,
-            'server_port': str(request.port) if request.port else ('443' if request.scheme == 'https' else '80'),
+            'server_port': server_port,
             'get_data': dict(request.query),
             'post_data': post_data
         }
