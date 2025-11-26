@@ -24,6 +24,3 @@ async def enable(services):
     
     # Keep the original saml route for backward compatibility with legacy handler
     app.router.add_route('*', '/saml', saml_svc.saml)
-
-    # Store saml_svc as a registered service so route handlers can access it
-    services.get('app_svc').register_subservice('saml_svc', saml_svc)
