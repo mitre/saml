@@ -426,10 +426,8 @@ class SamlService(BaseService):
         http_host = request.headers.get('X-Forwarded-Host', request.host)
 
         # Determine port based on protocol
-        if request.port:
-            server_port = str(request.port)
-        else:
-            server_port = '443' if is_https else '80'
+        # When behind ALB, use standard ports (443 for HTTPS, 80 for HTTP)
+        server_port = '443' if is_https else '80'
 
         ret_parameters = {
             'https': 'on' if is_https else 'off',
