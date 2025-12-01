@@ -18,7 +18,7 @@ class SamlService(BaseService):
         self.config_dir_path = os.path.join(Path(__file__).parents[1], 'conf')
         self.settings_path = os.path.join(self.config_dir_path, 'settings.json')
         self.user_mapping_path = os.path.join(self.config_dir_path, 'user_mapping.json')
-        
+
         # Load SAML configuration with better error handling
         try:
             with open(self.settings_path, 'rb') as settings_file:
@@ -29,7 +29,7 @@ class SamlService(BaseService):
         except json.JSONDecodeError as e:
             self.log.error(f'Invalid JSON in SAML configuration: {e}')
             self._saml_config = {}
-            
+
         # Load user mapping configuration
         try:
             with open(self.user_mapping_path, 'r') as mapping_file:
@@ -40,7 +40,7 @@ class SamlService(BaseService):
         except json.JSONDecodeError as e:
             self.log.error(f'Invalid JSON in user mapping configuration: {e}')
             self._user_mapping_config = self._get_default_user_mapping()
-            
+
         self.log = self.add_service('saml_svc', self)
 
     def _get_default_user_mapping(self) -> Dict[str, Any]:
@@ -60,9 +60,9 @@ class SamlService(BaseService):
         """Legacy handler - routes to appropriate specific handler based on path and method"""
         path = request.path
         method = request.method
-        
+
         self.log.debug(f'SAML legacy handler called: {method} {path}')
-        
+
         try:
             # Route to specific handlers based on path
             if path.endswith('/metadata'):
@@ -79,7 +79,7 @@ class SamlService(BaseService):
                     return await self.saml_acs_handler(request)
                 else:
                     return await self.saml_login_handler(request)
-                    
+
         except web.HTTPRedirection as http_redirect:
             raise http_redirect
         except Exception as e:
@@ -99,17 +99,17 @@ class SamlService(BaseService):
         """Create OneLogin SAML Auth object from request"""
         if not self._saml_config:
             raise Exception('SAML configuration not loaded')
-            
+
         saml_response = await self._prepare_auth_parameter(request)
         return OneLogin_Saml2_Auth(saml_response, self._saml_config)
 
     async def _saml_login(self, request):
         """Core SAML login logic with enhanced user provisioning"""
         self.log.debug(f'Handling SAML login: {request.method} {request.path}')
-        
+
         try:
             saml_auth = await self.get_saml_auth(request)
-            
+
             # Check if this is a SAML response (POST from IdP) or login initiation (GET)
             if request.method == 'POST':
                 post_data = await request.post()
@@ -117,23 +117,23 @@ class SamlService(BaseService):
                     # Process SAML response from IdP
                     self.log.debug('Processing SAML response from IdP')
                     saml_auth.process_response()
-                    
+
                     # Check for errors
                     self._handle_saml_auth_errors(saml_auth)
-                    
+
                     # Handle successful authentication with enhanced provisioning
                     if saml_auth.is_authenticated():
                         return await self._handle_enhanced_authentication(request, saml_auth)
                     else:
                         self.log.error('SAML authentication failed: not authenticated')
                         raise web.HTTPFound('/login')
-            
+
             # GET request or no SAML response - initiate login
             self.log.debug('Initiating SAML login redirect to IdP')
             redirect_url = saml_auth.login(return_to=str(request.url))
             self.log.debug(f'Redirecting to IdP: {redirect_url}')
             raise web.HTTPFound(redirect_url)
-            
+
         except web.HTTPRedirection:
             raise
         except Exception as e:
@@ -146,18 +146,18 @@ class SamlService(BaseService):
             # Extract user information from SAML response
             user_info = self._extract_user_info(saml_auth)
             self.log.debug(f'Extracted user info: {user_info}')
-            
+
             # Determine Caldera role based on SAML attributes
             caldera_role = self._determine_caldera_role(user_info)
             self.log.debug(f'Determined Caldera role: {caldera_role}')
-            
+
             # Provision or update user if enabled
             if self._is_user_provisioning_enabled():
                 await self._provision_user(user_info, caldera_role)
-            
+
             # Authenticate user
             await self._authenticate_user(request, caldera_role, user_info)
-            
+
         except Exception as e:
             self.log.error(f'Enhanced authentication failed: {e}')
             raise web.HTTPFound('/login')
@@ -166,14 +166,14 @@ class SamlService(BaseService):
         """Extract user information from SAML response"""
         attributes = saml_auth.get_attributes()
         name_id = saml_auth.get_nameid()
-        
+
         # Get configuration for attribute names
         user_provisioning = self._saml_config.get('user_provisioning', {})
         email_attr = user_provisioning.get('email_attribute', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress')
         name_attr = user_provisioning.get('name_attribute', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name')
         role_attr = user_provisioning.get('role_attribute', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role')
         group_attr = user_provisioning.get('group_attribute', 'http://schemas.xmlsoap.org/claims/Group')
-        
+
         # Extract values
         user_info = {
             'name_id': name_id,
@@ -183,11 +183,11 @@ class SamlService(BaseService):
             'groups': self._get_attribute_values(attributes, group_attr),
             'all_attributes': attributes
         }
-        
+
         # Use name_id as email if email not found
         if not user_info['email'] and name_id:
             user_info['email'] = name_id
-            
+
         return user_info
 
     def _get_attribute_value(self, attributes: Dict, attr_name: str) -> Optional[str]:
@@ -205,37 +205,37 @@ class SamlService(BaseService):
         default_role = user_provisioning.get('default_role', 'user')
         admin_roles = user_provisioning.get('admin_roles', ['admin', 'administrator'])
         admin_groups = user_provisioning.get('admin_groups', [])
-        
+
         # Check if user has admin roles
         for role in user_info.get('roles', []):
             if role.lower() in [r.lower() for r in admin_roles]:
                 return 'admin'
-        
+
         # Check if user is in admin groups
         for group in user_info.get('groups', []):
             if group in admin_groups:
                 return 'admin'
-        
+
         # Check role mappings
         role_mappings = self._user_mapping_config.get('role_mappings', {})
         for caldera_role, saml_roles in role_mappings.items():
             for user_role in user_info.get('roles', []):
                 if user_role.lower() in [r.lower() for r in saml_roles]:
                     return caldera_role
-        
+
         # Check group mappings
         group_mappings = self._user_mapping_config.get('group_mappings', {})
         for group in user_info.get('groups', []):
             if group in group_mappings:
                 return group_mappings[group]
-        
+
         # Check email domain mappings
         email_domain_mappings = self._user_mapping_config.get('email_domain_mappings', {})
         if user_info.get('email'):
             domain = user_info['email'].split('@')[-1] if '@' in user_info['email'] else ''
             if domain in email_domain_mappings:
                 return email_domain_mappings[domain]
-        
+
         return default_role
 
     def _is_user_provisioning_enabled(self) -> bool:
@@ -249,28 +249,28 @@ class SamlService(BaseService):
             auth_svc = self.get_service('auth_svc')
             if not auth_svc:
                 raise Exception('Auth service not available')
-            
+
             email = user_info.get('email')
             display_name = user_info.get('display_name', email)
-            
+
             if not email:
                 self.log.warning('No email found in SAML response, cannot provision user')
                 return
-            
+
             # Check if user exists
             user_exists = caldera_role in auth_svc.user_map
-            
+
             user_provisioning = self._saml_config.get('user_provisioning', {})
             create_missing = user_provisioning.get('create_missing_users', True)
             update_on_login = user_provisioning.get('update_on_login', True)
-            
+
             if not user_exists and create_missing:
                 # Create new user
                 self.log.info(f'Creating new user: {caldera_role} for {email}')
-                
+
                 # Define privileges based on role
                 privileges = self._get_role_privileges(caldera_role)
-                
+
                 # Add user to auth service
                 auth_svc.user_map[caldera_role] = {
                     'password': self._generate_temp_password(),
@@ -280,20 +280,20 @@ class SamlService(BaseService):
                     'saml_display_name': display_name,
                     'last_saml_login': self._get_current_timestamp()
                 }
-                
+
                 self.log.info(f'User {caldera_role} created successfully')
-                
+
             elif user_exists and update_on_login:
                 # Update existing user
                 self.log.debug(f'Updating existing user: {caldera_role}')
-                
+
                 user_data = auth_svc.user_map[caldera_role]
                 user_data.update({
                     'saml_email': email,
                     'saml_display_name': display_name,
                     'last_saml_login': self._get_current_timestamp()
                 })
-                
+
         except Exception as e:
             self.log.error(f'User provisioning failed: {e}')
             # Don't fail authentication if provisioning fails
@@ -326,10 +326,10 @@ class SamlService(BaseService):
         auth_svc = self.get_service('auth_svc')
         if not auth_svc:
             raise Exception('Auth service not available')
-            
+
         email = user_info.get('email', 'unknown@unknown.com')
         display_name = user_info.get('display_name', email)
-        
+
         if caldera_role in auth_svc.user_map:
             # Will raise redirect on success
             self.log.info(f'User "{display_name}" ({email}) authenticated via SAML as "{caldera_role}"')
@@ -355,19 +355,19 @@ class SamlService(BaseService):
         try:
             if not self._saml_config:
                 raise Exception('SAML configuration not loaded')
-                
+
             settings = OneLogin_Saml2_Settings(self._saml_config)
             metadata = settings.get_sp_metadata()
-            
+
             # Validate metadata
             errors = settings.check_sp_settings()
             if errors:
                 self.log.error(f'SP metadata validation errors: {errors}')
                 raise Exception(f'SAML metadata validation failed: {errors}')
-            
+
             self.log.debug('SAML metadata generated successfully')
             return web.Response(text=metadata, content_type='text/xml')
-            
+
         except Exception as e:
             self.log.error(f'Error generating SAML metadata: {e}')
             raise web.HTTPInternalServerError(text=f'SAML metadata error: {str(e)}')
@@ -377,7 +377,7 @@ class SamlService(BaseService):
         self.log.debug('SAML SLS handler called')
         try:
             saml_auth = await self.get_saml_auth(request)
-            
+
             if request.method == 'GET':
                 # Handle logout request from IdP
                 url = saml_auth.process_slo(delete_session_cb=lambda: None)
@@ -392,7 +392,7 @@ class SamlService(BaseService):
                 # Initiate logout
                 url = saml_auth.logout()
                 raise web.HTTPFound(url)
-                
+
         except web.HTTPRedirection:
             raise
         except Exception as e:
