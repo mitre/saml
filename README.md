@@ -1,4 +1,4 @@
-# MITRE Caldera Plugin: SAML
+# Caldera Plugin: SAML
 
 ## Overview
 `saml` is a Caldera plugin that provides SAML authentication for Caldera by establishing Caldera as
